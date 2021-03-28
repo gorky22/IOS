@@ -1,0 +1,196 @@
+#!/bin/sh
+
+POSIXLY_CORRECT=yes
+
+DIR=$PWD
+ND=0
+NF=0
+size=0
+change=""
+change1=0
+jump=0
+normalization=0
+skip=0
+
+while getopts "i:n" opt; do
+  case ${opt} in
+i ) input="$OPTARG"; change=$input; jump=1
+
+      ;;
+    n ) normalization=1
+      ;;
+    \? ) echo "$0: wrong operands. " >&2
+		exit 1
+
+      ;;
+  esac
+done
+
+shift $((OPTIND -1))
+
+
+jump=0
+
+
+
+if [ $# -eq 1 ]; then
+	DIR=$1
+fi
+
+if [ $# -gt 1 ]; then
+	echo "$0: Problem with arguments. ">&2
+		exit 1
+fi
+
+FHIST1=0		# in posix there are no array so i make variables
+FHIST2=0
+FHIST3=0
+FHIST4=0
+FHIST5=0
+FHIST6=0
+FHIST7=0
+FHIST8=0
+FHIST9=0
+
+
+print() 
+{
+	if [ "$1" -ne 0 ]; then					# function for printing #
+	        i=0
+		while [ "$i" -lt "$1" ]; do 
+		printf "#"
+		i=$((i+1))				
+		done
+	fi
+	printf '\n'
+}
+
+
+
+if [ "$change" ]; then								#change is variable for change when argument is -i
+	change1=$(find "$DIR" -regex  ".*/"$input"/.*" -or -name "$input" )
+fi	
+
+if [ "$change" ] ;then
+	for file in $change1 ; do							# in variable change 1 there are elemenst from find -name 
+		if [ "$DIR" = "$file" ] ;then
+			echo "$0: given argument must not cover name of the root directory." >&2
+		exit 1
+		fi
+	done
+
+fi
+
+if [ ! -d "$DIR" ]; then
+	echo "$0: Given directory: '$DIR' doesnt exists." >&2
+	exit 1
+fi
+
+for FILE in   $(find "$DIR" -type f -or -type d   2> /dev/null ); do
+	jump=0
+
+	if [ ! -r "$FILE" ]; then
+		continue
+	fi
+
+	# if we cant open program
+
+	if [ "$change" ]; then
+		for file in $change1 ; do
+			if [ "$file" = "$FILE" ]; then
+				jump=1	
+				break
+			fi
+		done	
+		
+		if [ "$jump" -eq 1 ] ; then 
+			continue
+		fi
+	fi
+	
+	if [ -d "$FILE" ]; then
+		ND=$((ND+1))
+			
+	elif [ -f "$FILE" ]; then
+		NF=$((NF+1))
+	
+		size=$(wc -c  < "$FILE" )
+		
+		if [  "$size" -lt 100 ]; then
+			FHIST1=$((FHIST1+1))
+		elif [ "$size" -lt 1024 ]; then
+			FHIST2=$((FHIST2+1))
+		elif [ "$size" -lt 10240 ]; then
+			FHIST3=$((FHIST3+1))
+		elif [ "$size" -lt 102400 ]; then
+			FHIST4=$((FHIST4+1))
+		elif [ "$size" -lt 1048576 ]; then
+			FHIST5=$((FHIST5+1))
+		elif [ "$size" -lt 10458760 ]; then
+			FHIST6=$((FHIST6+1))
+		elif [ "$size" -lt 104587600 ]; then
+			FHIST7=$((FHIST7+1))
+		elif [ "$size" -lt 1073741824 ]; then
+			FHIST8=$((FHIST8+1))
+		elif [ "$size" -ge 1073741824 ]; then
+			FHIST9=$((FHIST9+1))
+		fi
+
+	fi
+done
+
+normalize()
+{
+	#testing if there is screen shell and setting max size of cols
+       	namesize=13
+	if [ -t 1 ]; then
+
+		maxsize=$(tput cols)
+		maxsize=$((maxsize - 1))
+	else
+		maxsize=79
+	fi
+
+	realsize=$((maxsize - namesize))
+	#finding max element
+	max=0
+	tmp=0
+	for i in FHIST1 FHIST2 FHIST3 FHIST4 FHIST5 FHIST6 FHIST7 FHIST8 FHIST9; do
+       	 	eval tmp=\$$i	
+	 	
+		if [ "$tmp" -gt "$max" ]; then
+			max=$tmp
+		fi
+         done
+	
+	 if [ "$max" -gt "$realsize" ]; then
+		tmp=0
+		for i in FHIST1 FHIST2 FHIST3 FHIST4 FHIST5 FHIST6 FHIST7 FHIST8 FHIST9; do
+       	 	eval tmp=\$$i	
+		tmp=$((tmp * realsize / max)) 
+	 	eval $i=\$tmp
+		done
+	fi
+	
+}
+
+
+if [ "$normalization" -eq 1 ]; then
+	
+	normalize
+fi
+
+
+echo "Root directory: ""$DIR"
+echo "Directories: "$ND
+echo "All files: "$NF
+echo "File size histogram:"
+echo "  <100 B  : " "$(print "$FHIST1")"
+echo "  <1 KiB  : " "$(print "$FHIST2")"
+echo "  <10 KiB : " "$(print "$FHIST3")"
+echo "  <100 KiB: " "$(print "$FHIST4")"
+echo "  <1 MiB  : " "$(print "$FHIST5")"
+echo "  <10 MiB : " "$(print "$FHIST6")"
+echo "  <100 MiB: " "$(print "$FHIST7")"
+echo "  <1 Gib  : " "$(print "$FHIST8")"
+echo "  >=1 Gib : " "$(print "$FHIST9")"
